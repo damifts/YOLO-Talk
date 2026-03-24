@@ -15,14 +15,31 @@ load_dotenv()
 app = FastAPI(title="YOLO-Talk")
 model = YOLO('yolov8n')
 
-@app.get("/analyze")
-async def ricevi_img(file_immagine:UploadFile)-> dict[str, str | list[str]]:
+# Qui abilitiamo CORS per permettere al client Streamlit di chiamare il backend.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-#apertura e conversione immagine in RGB
+@app.post("/analyze")
+async def ricevi_img(file_immagine: UploadFile = File(...)) -> dict[str, str | list[str]]:
+
     try:
         contenuto_file_immagine = await file_immagine.read()
-        contenuto = Image.open(file_immagine).convert("RGB")
+        # immagine_utente = Image.open(io.BytesIO(contenuto_file_immagine)).convert("RGB")
+        # from PIL
+        immagine_utente = Image.open(file_immagine)
+
     except Exception as errore_img:
         raise HTTPException(status_code=400, detail="Immagine non valida") from errore_img
-    
-    risultati_yolo=model.predict(file_immagine)
+
+    # risultati_yolo = model.predict(immagine_utente)
+    risultati_yolo = model.predict(source=immagine_utente, save=True)  # save plotted images
+
+    for risultato in risultati_yolo:
+        for box in risultato.boxes:
+            cls = int(box.cls[0])
+            conf = float(box.conf[0])
+            print(f"Classe: {model.names[cls]}, Confidenza: {conf:.2f}")
