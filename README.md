@@ -18,3 +18,9 @@ Per avviare l'interfaccia utente (Frontend), aprire il terminale ed eseguire:
 
 ```cmd
 uv run streamlit run app/client.py
+
+Per avviare il server (Backend), aprire il terminale ed eseguire:
+
+```cmd
+uv run uvicorn app.server:app --reload
+```
