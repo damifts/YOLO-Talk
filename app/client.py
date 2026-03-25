@@ -1,4 +1,8 @@
+import base64
+from io import BytesIO
+
 import streamlit as st
+from PIL import Image
 import requests
 
 URL_BACKEND = "http://127.0.0.1:8000"
@@ -24,14 +28,14 @@ def main():
 
     if bottone_analisi:  #  usa la variabile, non st.button() di nuovo
         with st.spinner("Comunicazione con il server in corso..."):
-            file_payload = {"image": (file_immagine.name, file_immagine.getvalue(), file_immagine.type)}
+            file_payload = {"immagine": (file_immagine.name, file_immagine.getvalue(), file_immagine.type)}
+            data_payload = {"domanda": domanda}
 
             try:
-                #  domanda passata come query param
                 risposta = requests.post(
                     f"{URL_BACKEND}/analyze",
                     files=file_payload,
-                    params={"domanda": domanda}
+                    data=data_payload
                 )
 
                 if risposta.status_code == 200:
@@ -39,6 +43,12 @@ def main():
                     st.success("Analisi completata con successo.")
                     st.markdown(f"**Risposta:** {dati['risposta_gemini']}")
                     st.markdown(f"**Oggetti rilevati:** {dati['n_oggetti']}")
+                    
+                    if "image_b64" in dati:
+                        img_data = base64.b64decode(dati["image_b64"])
+                        img_annotata = Image.open(BytesIO(img_data))
+                        st.image(img_annotata, caption="Oggetti rilevati da YOLO")
+                    
                     with st.expander("Dettagli detection"):
                         st.json(dati['detections'])
                 else:

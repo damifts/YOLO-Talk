@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import base64
 from typing import List
 
 from dotenv import load_dotenv
@@ -33,20 +34,21 @@ class AnalyzeResponse(BaseModel):
     n_oggetti: int
     detections: List[Detection]
     risposta_gemini: str
+    image_b64: str
 
 # Carica il modello una sola volta all'avvio
 model = YOLO("yolov8n.pt")
 
 @app.post("/analyze")
-async def ricevi_img(
-    image: UploadFile = File(...),
+async def analizza_immagine(
+    immagine: UploadFile = File(...),
     domanda: str = "Cosa vedi nell'immagine?",
 ) -> AnalyzeResponse:
-    if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+    if immagine.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
         raise HTTPException(status_code=400, detail="Formato file non supportato.")
 
     try:
-        contenuto = await image.read()
+        contenuto = await immagine.read()
         img_pil = Image.open(io.BytesIO(contenuto)).convert("RGB")
 
         # 1. YOLO detection
@@ -69,6 +71,14 @@ async def ricevi_img(
                         },
                     }
                 )
+
+        # 1.b Immagine annotata direttamente da YOLO (box + label)
+        img_array = results[0].plot()
+        img_annotata = Image.fromarray(img_array[:, :, ::-1])
+
+        buffer = io.BytesIO()
+        img_annotata.save(buffer, format="PNG")
+        image_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
         # 2. Prompt costruito con detection formattate
         detections_json = json.dumps(detections, ensure_ascii=False, indent=2)
@@ -95,6 +105,7 @@ async def ricevi_img(
             n_oggetti=len(detections),
             detections=detections,
             risposta_gemini=response.text,
+            image_b64=image_b64,
         )
 
     except Exception as e:
