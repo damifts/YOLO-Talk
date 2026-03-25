@@ -1,21 +1,15 @@
-import base64
-import io
-import os
-from pathlib import Path
-
-import google.generativeai as genai
-from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+# backend.py
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
 from ultralytics import YOLO
-
-load_dotenv()
+from PIL import Image
+import io
+import uuid
+import os
 
 app = FastAPI(title="YOLO-Talk")
-model = YOLO('yolov8n')
 
-# Qui abilitiamo CORS per permettere al client Streamlit di chiamare il backend.
+# CORS per permettere chiamate dal frontend Streamlit
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,23 +17,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Carica il modello una sola volta all'avvio
+model = YOLO("yolov8n.pt")
+
 @app.post("/analyze")
-async def ricevi_img(file_immagine: UploadFile = File(...)) -> dict[str, str | list[str]]:
+async def ricevi_img(image: UploadFile = File(...)) -> dict:
+    # Validazione tipo file
+    if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+        raise HTTPException(status_code=400, detail="Formato file non supportato. Usa JPG o PNG.")
 
     try:
-        contenuto_file_immagine = await file_immagine.read()
-        # immagine_utente = Image.open(io.BytesIO(contenuto_file_immagine)).convert("RGB")
-        # from PIL
-        immagine_utente = Image.open(file_immagine)
+        # Leggi i bytes e converti in immagine PIL
+        contenuto = await image.read()
+        img_pil = Image.open(io.BytesIO(contenuto)).convert("RGB")
 
-    except Exception as errore_img:
-        raise HTTPException(status_code=400, detail="Immagine non valida") from errore_img
+        # Esegui la detection
+        results = model(img_pil)
 
-    # risultati_yolo = model.predict(immagine_utente)
-    risultati_yolo = model.predict(source=immagine_utente, save=True)  # save plotted images
+        # Estrai le detection
+        detections = []
+        for result in results:
+            for box in result.boxes:
+                cls_id = int(box.cls[0])
+                conf = float(box.conf[0])
+                xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
 
-    for risultato in risultati_yolo:
-        for box in risultato.boxes:
-            cls = int(box.cls[0])
-            conf = float(box.conf[0])
-            print(f"Classe: {model.names[cls]}, Confidenza: {conf:.2f}")
+                detections.append({
+                    "classe": model.names[cls_id],
+                    "confidenza": round(conf, 4),
+                    "bounding_box": {
+                        "x1": round(xyxy[0], 1),
+                        "y1": round(xyxy[1], 1),
+                        "x2": round(xyxy[2], 1),
+                        "y2": round(xyxy[3], 1),
+                    }
+                })
+
+        return {
+            "status": "ok",
+            "file": image.filename,
+            "n_oggetti": len(detections),
+            "detections": detections,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante l'analisi: {str(e)}")
