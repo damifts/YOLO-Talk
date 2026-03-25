@@ -1,11 +1,16 @@
 # backend.py
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from google import genai
 from ultralytics import YOLO
 from PIL import Image
 import io
 import uuid
 import os
+from dotenv import load_dotenv
+
+# Carica le variabili dal file .env
+load_dotenv()
 
 app = FastAPI(title="YOLO-Talk")
 
@@ -13,6 +18,14 @@ app = FastAPI(title="YOLO-Talk")
 # Carica il modello una sola volta all'avvio
 model = YOLO("yolov8n.pt")
 gemini = genai.GenerativeModel("gemini-2.5-flash")
+
+# CORS per permettere chiamate dal frontend Streamlit
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/analyze")
 async def ricevi_img(image: UploadFile = File(...)) -> dict:
