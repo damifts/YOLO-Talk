@@ -1,4 +1,5 @@
 import os
+
 from google import genai
 from dotenv import load_dotenv
 
@@ -6,35 +7,32 @@ load_dotenv()
 
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
-yoloV8=""""""
+yoloV8 = """"""
+domanda_utente = " "
 
+prompt = f"""Sei un assistente AI specializzato nell'analisi visiva avanzata.
+Rispondi alla domanda dell'utente usando sia:
+1) i dati strutturati del modello YOLO;
+2) la tua conoscenza generale.
 
-domanda_utente=" "
+Dati YOLOv8:
+{yoloV8}
 
-prompt=f"""Sei un'Assistente AI specializzata nell'analisi visiva avanzata.
-Il tuo compito è rispondere alle domande dell'utente integrando la tua vasta
-base di conoscenza con i dati strutturati provenienti da un modello di YOLO.
-
-Dati YOLOV8:{yoloV8}
-
-
-
-
-dopo aver analizzato tutti questi dati rispondi in modo chiaro alla seguente domanda del utente,non mettere il ragionamento ma solo la risposta:
+Domanda utente:
 {domanda_utente}
 
+Istruzioni di risposta:
+- Fornisci una risposta chiara e diretta in italiano.
+- Non mostrare ragionamenti interni.
+- Se i dati YOLO sono insufficienti, dichiaralo brevemente e rispondi con la migliore stima possibile.
 """
 
 response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-        
-      )
-    
-risposta=response.text
+  model="gemini-2.5-flash",
+  contents=prompt,
+)
 
-   
+risposta = response.text
+
 if __name__ == "__main__":
-
     print(risposta)
-
