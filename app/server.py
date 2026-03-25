@@ -1,13 +1,15 @@
-# backend.py
-from fastapi import FastAPI, File, UploadFile, HTTPException
+import io
+import json
+import os
+from typing import List
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
-from ultralytics import YOLO
 from PIL import Image
-import io
-import uuid
-import os
-from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from ultralytics import YOLO
 
 # Carica le variabili dal file .env
 load_dotenv()
@@ -19,7 +21,23 @@ yoloV8 = """"""
 domanda_utente = " "
 
 
+class BoundingBox(BaseModel):
+    x1: float
+    y1: float
+    x2: float
+    y2: float
 
+
+class Detection(BaseModel):
+    classe: str
+    confidenza: float = Field(ge=0.0, le=1.0)
+    bounding_box: BoundingBox
+
+
+class AnalyzeResponse(BaseModel):
+    n_oggetti: int
+    detections: List[Detection]
+    risposta_gemini: str
 
 # Carica il modello una sola volta all'avvio
 model = YOLO("yolov8n.pt")
@@ -32,8 +50,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.post("/analyze")
-async def ricevi_img(image: UploadFile = File(...), domanda: str = "Cosa vedi nell'immagine?") -> dict:
+async def ricevi_img(
+    image: UploadFile = File(...),
+    domanda: str = "Cosa vedi nell'immagine?",
+) -> AnalyzeResponse:
     if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
         raise HTTPException(status_code=400, detail="Formato file non supportato.")
 
@@ -49,33 +71,33 @@ async def ricevi_img(image: UploadFile = File(...), domanda: str = "Cosa vedi ne
                 cls_id = int(box.cls[0])
                 conf = float(box.conf[0])
                 xyxy = box.xyxy[0].tolist()
-                detections.append({
-                    "classe": model.names[cls_id],
-                    "confidenza": round(conf, 4),
-                    "bounding_box": {
-                        "x1": round(xyxy[0], 1),
-                        "y1": round(xyxy[1], 1),
-                        "x2": round(xyxy[2], 1),
-                        "y2": round(xyxy[3], 1),
+                detections.append(
+                    {
+                        "classe": model.names[cls_id],
+                        "confidenza": round(conf, 4),
+                        "bounding_box": {
+                            "x1": round(xyxy[0], 1),
+                            "y1": round(xyxy[1], 1),
+                            "x2": round(xyxy[2], 1),
+                            "y2": round(xyxy[3], 1),
+                        },
                     }
-                })
+                )
 
-        # 2. Prompt costruito CON le detection reali
-        prompt = f"""Sei un assistente AI specializzato nell'analisi visiva avanzata.
-Rispondi alla domanda dell'utente usando sia:
-1) i dati strutturati del modello YOLO;
-2) la tua conoscenza generale.
-
-Dati YOLOv8:
-{detections}
-
-Domanda utente:
-{domanda}
-
-Istruzioni:
-- Rispondi in italiano, in modo chiaro e diretto.
-- Se i dati YOLO sono insufficienti, dichiaralo brevemente.
-"""
+        # 2. Prompt costruito con detection formattate
+        detections_json = json.dumps(detections, ensure_ascii=False, indent=2)
+        prompt = (
+            "Sei un assistente AI specializzato nell'analisi visiva avanzata.\n"
+            "Usa sia i dati strutturati di YOLO sia la tua conoscenza generale.\n\n"
+            "Dati YOLOv8 (JSON):\n"
+            f"{detections_json}\n\n"
+            "Domanda utente:\n"
+            f"{domanda}\n\n"
+            "Istruzioni:\n"
+            "- Rispondi in italiano, in modo chiaro e diretto.\n"
+            "- Non includere il ragionamento interno.\n"
+            "- Se i dati YOLO sono insufficienti, dichiaralo brevemente.\n"
+        )
 
         # 3. Chiamata Gemini DENTRO il try, con i dati reali
         response = client.models.generate_content(
@@ -83,13 +105,11 @@ Istruzioni:
             contents=prompt,
         )
 
-        return {
-            "status": "ok",
-            "file": image.filename,
-            "n_oggetti": len(detections),
-            "detections": detections,
-            "risposta_gemini": response.text,  # ← inclusa nel return!
-        }
+        return AnalyzeResponse(
+            n_oggetti=len(detections),
+            detections=detections,
+            risposta_gemini=response.text,
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
