@@ -9,16 +9,10 @@ import os
 
 app = FastAPI(title="YOLO-Talk")
 
-# CORS per permettere chiamate dal frontend Streamlit
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Carica il modello una sola volta all'avvio
 model = YOLO("yolov8n.pt")
+gemini = genai.GenerativeModel("gemini-2.5-flash")
 
 @app.post("/analyze")
 async def ricevi_img(image: UploadFile = File(...)) -> dict:
@@ -52,6 +46,7 @@ async def ricevi_img(image: UploadFile = File(...)) -> dict:
                         "y2": round(xyxy[3], 1),
                     }
                 })
+    
 
         return {
             "status": "ok",
