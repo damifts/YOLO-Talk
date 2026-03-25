@@ -1,26 +1,32 @@
 # YOLO-Talk (Visual Q&A)
 
-Progetto per l'analisi di immagini tramite YOLOv8 e Google Gemini.
+Analisi immagini con YOLOv8 + Gemini.
 
-### Setup iniziale (Windows)
+## Requisiti
 
-1.  Assicurarsi che **uv** sia installato sul sistema.
-2.  Aprire il terminale nella cartella del progetto ed eseguire:
+- Python 3.12+
+- uv installato
+- Variabile ambiente GOOGLE_API_KEY configurata (es. file .env)
+- Progetto in una cartella locale (non sotto OneDrive)
 
-    ```cmd
-    set UV_LINK_MODE=copy
-    uv sync
-    ```
-
-### Avvio dell'applicazione
-
-Per avviare l'interfaccia utente (Frontend), aprire il terminale ed eseguire:
+## Setup (Windows)
 
 ```cmd
-uv run streamlit run app/client.py
+set UV_LINK_MODE=copy
+uv cache clean
+uv sync
+```
 
-Per avviare il server (Backend), aprire il terminale ed eseguire:
+## Avvio
+
+Backend:
 
 ```cmd
 uv run uvicorn app.server:app --reload
+```
+
+Frontend:
+
+```cmd
+uv run streamlit run app/client.py
 ```
