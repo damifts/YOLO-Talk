@@ -6,10 +6,22 @@ URL_BACKEND = "http://127.0.0.1:8000"
 
 def main():
     st.title("YOLO-Talk - Interfaccia di Analisi")
-    st.write("Seleziona un file immagine per testare il rilevamento oggetti del server.")
+    st.write("Seleziona un file immagine ed inserisci una domanda per ottenere informazioni sul contenuto dell'immagine.")
 
     # Caricamento file immagine
     file_immagine = st.file_uploader("Immagine", type=["jpg", "jpeg", "png"])
+    # Input per la domanda da inviare al backend
+    domanda = st.text_input("Domanda", placeholder="Chiedi cosa vuoi rilevare dall'immagine (es. 'Quante persone ci sono?', 'C'è qualcosa di pericoloso?')")
+    bottone_disabilitato = not (file_immagine and domanda.strip())
+    if not file_immagine:
+        testo_help = "Carica un'immagine per abilitare l'invio."
+    elif not domanda.strip():
+        testo_help = "Inserisci una domanda per abilitare l'invio."
+    elif not (domanda.strip() and file_immagine):
+        testo_help = "Carica un'immagine e inserisci una domanda per abilitare l'invio."
+    else:
+        testo_help = ""
+    bottone_analisi = st.button("Invia Analisi", disabled=bottone_disabilitato, help=testo_help)
     
     if st.button("Invia Analisi"):
         if file_immagine:
