@@ -2381,7 +2381,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi" },
-    { name = "google-genai", specifier = ">=1.68.0" },
+    { name = "google-genai" },
     { name = "google-generativeai" },
     { name = "pillow" },
     { name = "python-dotenv" },

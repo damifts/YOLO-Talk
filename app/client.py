@@ -1,36 +1,64 @@
-import streamlit as st
-import requests
+# backend.py
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from ultralytics import YOLO
+from PIL import Image
+import io
+import uuid
+import os
 
-# URL predefinito del backend locale
-URL_BACKEND = "http://127.0.0.1:8000"
+app = FastAPI(title="YOLO-Talk")
 
-def main():
-    st.title("YOLO-Talk - Interfaccia di Analisi")
-    st.write("Seleziona un file immagine per testare il rilevamento oggetti del server.")
+# CORS per permettere chiamate dal frontend Streamlit
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    # Caricamento file immagine
-    file_immagine = st.file_uploader("Immagine", type=["jpg", "jpeg", "png"])
-    
-    if st.button("Invia Analisi"):
-        if file_immagine:
-            with st.spinner("Comunicazione con il server in corso..."):
-                # Preparazione payload per FastAPI
-                file_payload = {"image": (file_immagine.name, file_immagine.getvalue(), file_immagine.type)}
-                
-                try:
-                    # Chiamata POST al backend (senza campo question)
-                    risposta = requests.post(f"{URL_BACKEND}/analyze", files=file_payload)
-                    
-                    if risposta.status_code == 200:
-                        st.success("Analisi completata con successo.")
-                        st.json(risposta.json())
-                    else:
-                        st.error(f"Errore del server: codice {risposta.status_code}")
-                
-                except Exception as e:
-                    st.error(f"Impossibile raggiungere il backend: {e}")
-        else:
-            st.warning("Caricare un file prima di procedere.")
+# Carica il modello una sola volta all'avvio
+model = YOLO("yolov8n.pt")
 
-if __name__ == "__main__":
-    main()
+@app.post("/analyze")
+async def ricevi_img(image: UploadFile = File(...)) -> dict:
+    # Validazione tipo file
+    if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+        raise HTTPException(status_code=400, detail="Formato file non supportato. Usa JPG o PNG.")
+
+    try:
+        # Leggi i bytes e converti in immagine PIL
+        contenuto = await image.read()
+        img_pil = Image.open(io.BytesIO(contenuto)).convert("RGB")
+
+        # Esegui la detection
+        results = model(img_pil)
+
+        # Estrai le detection
+        detections = []
+        for result in results:
+            for box in result.boxes:
+                cls_id = int(box.cls[0])
+                conf = float(box.conf[0])
+                xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
+
+                detections.append({
+                    "classe": model.names[cls_id],
+                    "confidenza": round(conf, 4),
+                    "bounding_box": {
+                        "x1": round(xyxy[0], 1),
+                        "y1": round(xyxy[1], 1),
+                        "x2": round(xyxy[2], 1),
+                        "y2": round(xyxy[3], 1),
+                    }
+                })
+
+        return {
+            "status": "ok",
+            "file": image.filename,
+            "n_oggetti": len(detections),
+            "detections": detections,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante l'analisi: {str(e)}")
