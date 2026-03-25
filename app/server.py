@@ -13,11 +13,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="YOLO-Talk")
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+yoloV8 = """"""
+
+domanda_utente = " "
+
+
 
 
 # Carica il modello una sola volta all'avvio
 model = YOLO("yolov8n.pt")
-gemini = genai.GenerativeModel("gemini-2.5-flash")
 
 # CORS per permettere chiamate dal frontend Streamlit
 app.add_middleware(
@@ -28,27 +33,22 @@ app.add_middleware(
 )
 
 @app.post("/analyze")
-async def ricevi_img(image: UploadFile = File(...)) -> dict:
-    # Validazione tipo file
+async def ricevi_img(image: UploadFile = File(...), domanda: str = "Cosa vedi nell'immagine?") -> dict:
     if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
-        raise HTTPException(status_code=400, detail="Formato file non supportato. Usa JPG o PNG.")
+        raise HTTPException(status_code=400, detail="Formato file non supportato.")
 
     try:
-        # Leggi i bytes e converti in immagine PIL
         contenuto = await image.read()
         img_pil = Image.open(io.BytesIO(contenuto)).convert("RGB")
 
-        # Esegui la detection
+        # 1. YOLO detection
         results = model(img_pil)
-
-        # Estrai le detection
         detections = []
         for result in results:
             for box in result.boxes:
                 cls_id = int(box.cls[0])
                 conf = float(box.conf[0])
-                xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
-
+                xyxy = box.xyxy[0].tolist()
                 detections.append({
                     "classe": model.names[cls_id],
                     "confidenza": round(conf, 4),
@@ -59,14 +59,37 @@ async def ricevi_img(image: UploadFile = File(...)) -> dict:
                         "y2": round(xyxy[3], 1),
                     }
                 })
-    
+
+        # 2. Prompt costruito CON le detection reali
+        prompt = f"""Sei un assistente AI specializzato nell'analisi visiva avanzata.
+Rispondi alla domanda dell'utente usando sia:
+1) i dati strutturati del modello YOLO;
+2) la tua conoscenza generale.
+
+Dati YOLOv8:
+{detections}
+
+Domanda utente:
+{domanda}
+
+Istruzioni:
+- Rispondi in italiano, in modo chiaro e diretto.
+- Se i dati YOLO sono insufficienti, dichiaralo brevemente.
+"""
+
+        # 3. Chiamata Gemini DENTRO il try, con i dati reali
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
 
         return {
             "status": "ok",
             "file": image.filename,
             "n_oggetti": len(detections),
             "detections": detections,
+            "risposta_gemini": response.text,  # ← inclusa nel return!
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Errore durante l'analisi: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
