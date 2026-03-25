@@ -5,7 +5,6 @@ from typing import List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from PIL import Image
 from pydantic import BaseModel, Field
@@ -16,10 +15,6 @@ load_dotenv()
 
 app = FastAPI(title="YOLO-Talk")
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-yoloV8 = """"""
-
-domanda_utente = " "
-
 
 class BoundingBox(BaseModel):
     x1: float
@@ -41,15 +36,6 @@ class AnalyzeResponse(BaseModel):
 
 # Carica il modello una sola volta all'avvio
 model = YOLO("yolov8n.pt")
-
-# CORS per permettere chiamate dal frontend Streamlit
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 @app.post("/analyze")
 async def ricevi_img(

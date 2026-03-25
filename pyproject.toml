@@ -9,9 +9,8 @@ dependencies = [
     "streamlit",
     "ultralytics",
     "google-generativeai",
-    "python-dotenv",
     "pillow",
     "python-multipart",
     "google-genai",
-    "dotenv>=0.9.9",
+    "dotenv",
 ]
