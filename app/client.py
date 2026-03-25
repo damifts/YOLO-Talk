@@ -19,15 +19,15 @@ def main():
     else:
         testo_help = ""
 
-    # ✅ UN solo bottone, salvato in variabile
+    #  UN solo bottone, salvato in variabile
     bottone_analisi = st.button("Invia Analisi", disabled=bottone_disabilitato, help=testo_help)
 
-    if bottone_analisi:  # ✅ usa la variabile, non st.button() di nuovo
+    if bottone_analisi:  #  usa la variabile, non st.button() di nuovo
         with st.spinner("Comunicazione con il server in corso..."):
             file_payload = {"image": (file_immagine.name, file_immagine.getvalue(), file_immagine.type)}
 
             try:
-                # ✅ domanda passata come query param
+                #  domanda passata come query param
                 risposta = requests.post(
                     f"{URL_BACKEND}/analyze",
                     files=file_payload,
