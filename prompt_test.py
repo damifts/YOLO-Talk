@@ -28,7 +28,7 @@ Istruzioni di risposta:
 """
 
 response = client.models.generate_content(
-  model="gemini-2.5-flash",
+  model="gemma-4-26b-a4b-it",
   contents=prompt,
 )
 
