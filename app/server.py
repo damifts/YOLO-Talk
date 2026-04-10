@@ -3,7 +3,6 @@ import json
 import os
 import base64
 from typing import List
-from openai import OpenAI
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
