@@ -3,6 +3,7 @@ import json
 import os
 import base64
 from typing import List
+from openai import OpenAI
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -16,6 +17,7 @@ load_dotenv()
 
 app = FastAPI(title="YOLO-Talk")
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+
 
 class BoundingBox(BaseModel):
     x1: float
@@ -36,8 +38,10 @@ class AnalyzeResponse(BaseModel):
     risposta_gemini: str
     image_b64: str
 
+
 # Carica il modello una sola volta all'avvio
 model = YOLO("yolov8n.pt")
+
 
 @app.post("/analyze")
 async def analizza_immagine(
@@ -97,7 +101,7 @@ async def analizza_immagine(
 
         # 3. Chiamata Gemini DENTRO il try, con i dati reali
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemma-4-26b-a4b-it",
             contents=prompt,
         )
 
